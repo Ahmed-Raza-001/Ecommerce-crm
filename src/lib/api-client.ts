@@ -13,7 +13,7 @@ import {
 import { uploadImageToSupabase } from "./supabase";
 
 export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+  process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000" ;
 
 function mapSymfonyProduct(raw: any): Product {
   return {
@@ -27,6 +27,13 @@ function mapSymfonyProduct(raw: any): Product {
     costPrice: raw.costPrice ? Number(raw.costPrice) : undefined,
     stock: Number(raw.stock) || 0,
     status: raw.status || "active",
+    isNewArrival: Boolean(raw.isNewArrival ?? raw.is_new_arrival),
+    isBestSeller: Boolean(raw.isBestSeller ?? raw.is_best_seller),
+    weight: raw.weight || undefined,
+    material: raw.material || undefined,
+    colour: raw.colour || raw.color || undefined,
+    size: raw.size || undefined,
+    jewelleryType: raw.jewelleryType || raw.jewellery_type || undefined,
     category: raw.category
       ? {
           id: raw.category.id,
@@ -39,7 +46,7 @@ function mapSymfonyProduct(raw: any): Product {
     categoryId: raw.category?.id || raw.category_id || raw.categoryId || null,
     image: raw.image || null,
     gallery: raw.gallery || (raw.image ? [raw.image] : []),
-    tags: raw.tags || ["Imitation Jewellery"],
+    tags: Array.isArray(raw.tags) && raw.tags.length > 0 ? raw.tags : ["Imitation Jewellery"],
     createdAt: raw.createdAt || new Date().toISOString(),
     updatedAt: raw.updatedAt,
   };
@@ -82,11 +89,11 @@ class ApiClient {
 
   public handleUnauthorized() {
     if (typeof window !== "undefined") {
-      const hadToken = !!localStorage.getItem("ecommerce_crm_token");
+      const hadUser = !!localStorage.getItem("ecommerce_crm_user");
       localStorage.removeItem("ecommerce_crm_token");
       localStorage.removeItem("ecommerce_crm_user");
 
-      if (hadToken && !window.location.pathname.startsWith("/login")) {
+      if (hadUser && !window.location.pathname.startsWith("/login")) {
         window.location.href = `/login?redirect=${encodeURIComponent(window.location.pathname)}`;
       }
     }
@@ -104,75 +111,70 @@ class ApiClient {
     return headers;
   }
 
-  private isRefreshingToken = false;
-  private refreshPromise: Promise<string | null> | null = null;
-
-  public async refreshJwtToken(): Promise<string | null> {
-    if (this.isRefreshingToken && this.refreshPromise) {
-      return this.refreshPromise;
-    }
-
-    const oldToken = this.getAuthToken();
-    if (!oldToken) return null;
-
-    this.isRefreshingToken = true;
-    this.refreshPromise = (async () => {
-      try {
-        const res = await fetch(`${API_BASE_URL}/api/token/refresh`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ token: oldToken }),
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          if (data.token) {
-            console.log("JWT Token refreshed successfully after expiration.");
-            if (typeof window !== "undefined") {
-              localStorage.setItem("ecommerce_crm_token", data.token);
-            }
-            return data.token as string;
-          }
-        }
-      } catch (err) {
-        console.warn("Failed to generate new JWT token:", err);
-      } finally {
-        this.isRefreshingToken = false;
-        this.refreshPromise = null;
-      }
-      return null;
-    })();
-
-    return this.refreshPromise;
-  }
-
   public async fetchWithAuth(url: string, init: RequestInit = {}): Promise<Response> {
     const headers = new Headers(init.headers || {});
+    if (!headers.has("Content-Type") && !(init.body instanceof FormData)) {
+      headers.set("Content-Type", "application/json");
+    }
+
     const token = this.getAuthToken();
     if (token && !headers.has("Authorization")) {
       headers.set("Authorization", `Bearer ${token}`);
     }
 
-    let res = await fetch(url, { ...init, headers });
+    let requestUrl = url;
+    if (token && token !== "session_cookie_active") {
+      try {
+        const parsedUrl = new URL(url, typeof window !== "undefined" ? window.location.origin : API_BASE_URL);
+        if (!parsedUrl.searchParams.has("token")) {
+          parsedUrl.searchParams.set("token", token);
+          requestUrl = parsedUrl.toString();
+        }
+      } catch (err) {
+        console.warn("Failed to append token query param:", err);
+      }
+    }
+
+    let res = await fetch(requestUrl, {
+      ...init,
+      headers,
+      credentials: "include",
+    });
 
     if (res.status === 401) {
       const cloned = res.clone();
       const errData = await cloned.json().catch(() => ({}));
-      
+
       const isExpired =
         errData.code === 401 ||
         (typeof errData.message === "string" &&
           (errData.message.toLowerCase().includes("expired") ||
            errData.message.toLowerCase().includes("jwt")));
 
-      if (isExpired && token) {
-        console.warn("Token expired. Requesting a new JWT token from backend...");
-        const newToken = await this.refreshJwtToken();
-        if (newToken) {
-          console.log("Retrying request with new JWT token...");
-          const retryHeaders = new Headers(init.headers || {});
-          retryHeaders.set("Authorization", `Bearer ${newToken}`);
-          res = await fetch(url, { ...init, headers: retryHeaders });
+      if (isExpired) {
+        console.warn("Session token expired. Attempting token refresh...");
+        const refreshRes = await fetch(`${API_BASE_URL}/api/token/refresh`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          credentials: "include",
+          body: JSON.stringify({ token: token || "" }),
+        });
+
+        if (refreshRes.ok) {
+          const refreshData = await refreshRes.json();
+          if (refreshData.token) {
+            localStorage.setItem("ecommerce_crm_token", refreshData.token);
+            headers.set("Authorization", `Bearer ${refreshData.token}`);
+          }
+          console.log("Retrying request after token refresh...");
+          res = await fetch(url, {
+            ...init,
+            headers,
+            credentials: "include",
+          });
           return res;
         }
       }
@@ -183,13 +185,13 @@ class ApiClient {
     return res;
   }
 
-
   async login(email: string, password: string): Promise<{ token: string; user: User }> {
     if (!this.isDemoMode()) {
       try {
         const res = await fetch(`${API_BASE_URL}/api/login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          credentials: "include",
           body: JSON.stringify({ email, password }),
         });
 
@@ -200,12 +202,10 @@ class ApiClient {
         }
 
         const data = await res.json();
-        const token = data.token;
-        if (!token) throw new Error("No authentication token returned by server.");
+        const token = data.token || "session_cookie_active";
 
-        // Store token in localStorage immediately for subsequent requests
-        if (typeof window !== "undefined") {
-          localStorage.setItem("ecommerce_crm_token", token);
+        if (typeof window !== "undefined" && data.token) {
+          localStorage.setItem("ecommerce_crm_token", data.token);
         }
 
         // Fetch current user details from /api/me
@@ -214,13 +214,11 @@ class ApiClient {
           email: email,
           name: email.split("@")[0].toUpperCase(),
           role: "admin",
-          avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80",
+          avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=AdminUser",
         };
 
         try {
-          const meRes = await fetch(`${API_BASE_URL}/api/me`, {
-            headers: this.getAuthHeaders(),
-          });
+          const meRes = await this.fetchWithAuth(`${API_BASE_URL}/api/me`);
           if (meRes.ok) {
             const meData = await meRes.json();
             user = {
@@ -228,7 +226,7 @@ class ApiClient {
               email: meData.email || email,
               name: (meData.email || email).split("@")[0].toUpperCase(),
               role: meData.roles?.includes("ROLE_ADMIN") ? "admin" : "manager",
-              avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80",
+              avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=AdminUser",
             };
           }
         } catch (meErr) {
@@ -253,7 +251,7 @@ class ApiClient {
       email: email,
       name: email.split("@")[0].toUpperCase(),
       role: "admin",
-      avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80",
+      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=AdminUser",
     };
     if (typeof window !== "undefined") {
       localStorage.setItem("ecommerce_crm_token", token);
@@ -264,13 +262,13 @@ class ApiClient {
 
   async getCurrentUser(): Promise<User | null> {
     const token = this.getAuthToken();
-    if (!token) return null;
+    if (!token && typeof window !== "undefined" && !localStorage.getItem("ecommerce_crm_user")) {
+      return null;
+    }
 
     if (!this.isDemoMode()) {
       try {
-        const res = await this.fetchWithAuth(`${API_BASE_URL}/api/me`, {
-          headers: this.getAuthHeaders(),
-        });
+        const res = await this.fetchWithAuth(`${API_BASE_URL}/api/me`);
         if (res.ok) {
           const meData = await res.json();
           const user: User = {
@@ -278,7 +276,7 @@ class ApiClient {
             email: meData.email,
             name: meData.email.split("@")[0].toUpperCase(),
             role: meData.roles?.includes("ROLE_ADMIN") ? "admin" : "manager",
-            avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80",
+            avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=AdminUser",
           };
           if (typeof window !== "undefined") {
             localStorage.setItem("ecommerce_crm_user", JSON.stringify(user));
@@ -429,12 +427,7 @@ class ApiClient {
   async getProduct(id: number | string): Promise<Product | null> {
     if (!this.isDemoMode()) {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/products/${id}`, {
-          headers: {
-            "Content-Type": "application/json",
-            ...(this.getAuthToken() ? { Authorization: `Bearer ${this.getAuthToken()}` } : {}),
-          },
-        });
+        const res = await this.fetchWithAuth(`${API_BASE_URL}/api/products/${id}`);
         if (res.ok) {
           const raw = await res.json();
           return mapSymfonyProduct(raw);
@@ -457,23 +450,25 @@ class ApiClient {
           price: formData.price,
           stock: formData.stock,
           image: formData.image,
+          status: formData.status || "active",
+          is_new_arrival: formData.isNewArrival || false,
+          is_best_seller: formData.isBestSeller || false,
+          tags: formData.tags || [],
+          weight: formData.weight || null,
+          material: formData.material || null,
+          colour: formData.colour || null,
+          size: formData.size || null,
+          jewellery_type: formData.jewelleryType || null,
           category_id: formData.categoryId ? String(formData.categoryId) : null,
         };
 
-        const res = await fetch(`${API_BASE_URL}/api/products`, {
+        const res = await this.fetchWithAuth(`${API_BASE_URL}/api/products`, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(this.getAuthToken() ? { Authorization: `Bearer ${this.getAuthToken()}` } : {}),
-          },
           body: JSON.stringify(symfonyPayload),
         });
         if (res.ok) {
           const raw = await res.json();
           return mapSymfonyProduct(raw);
-        } else if (res.status === 401) {
-          this.handleUnauthorized();
-          throw new Error("401 Unauthorized: Session expired. Please log in again.");
         } else {
           const errData = await res.json().catch(() => ({}));
           throw new Error(errData.message || `Server Error (${res.status}): PostgreSQL connection or backend error.`);
@@ -511,23 +506,32 @@ class ApiClient {
         if (data.price !== undefined) symfonyPayload.price = data.price;
         if (data.stock !== undefined) symfonyPayload.stock = data.stock;
         if (data.image !== undefined) symfonyPayload.image = data.image;
+        if (data.status !== undefined) symfonyPayload.status = data.status;
+        if (data.isNewArrival !== undefined) symfonyPayload.is_new_arrival = data.isNewArrival;
+        if (data.isBestSeller !== undefined) symfonyPayload.is_best_seller = data.isBestSeller;
+        if (data.tags !== undefined) symfonyPayload.tags = data.tags;
+        if (data.weight !== undefined) symfonyPayload.weight = data.weight;
+        if (data.material !== undefined) symfonyPayload.material = data.material;
+        if (data.colour !== undefined) symfonyPayload.colour = data.colour;
+        if (data.size !== undefined) symfonyPayload.size = data.size;
+        if (data.jewelleryType !== undefined) symfonyPayload.jewellery_type = data.jewelleryType;
         if (data.categoryId !== undefined)
           symfonyPayload.category_id = data.categoryId ? String(data.categoryId) : null;
 
-        const res = await fetch(`${API_BASE_URL}/api/products/${id}`, {
+        const res = await this.fetchWithAuth(`${API_BASE_URL}/api/products/${id}`, {
           method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            ...(this.getAuthToken() ? { Authorization: `Bearer ${this.getAuthToken()}` } : {}),
-          },
           body: JSON.stringify(symfonyPayload),
         });
         if (res.ok) {
           const raw = await res.json();
           return mapSymfonyProduct(raw);
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.message || `Update failed: Product #${id} server error (${res.status}).`);
         }
-      } catch (err) {
-        console.warn("Backend updateProduct failed, using local store fallback:", err);
+      } catch (err: any) {
+        console.error("Backend updateProduct failed:", err);
+        throw err;
       }
     }
 
@@ -555,15 +559,12 @@ class ApiClient {
   async deleteProduct(id: number | string): Promise<boolean> {
     if (!this.isDemoMode()) {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/products/${id}`, {
+        const res = await this.fetchWithAuth(`${API_BASE_URL}/api/products/${id}`, {
           method: "DELETE",
-          headers: {
-            ...(this.getAuthToken() ? { Authorization: `Bearer ${this.getAuthToken()}` } : {}),
-          },
         });
         if (res.ok) return true;
       } catch (err) {
-        console.warn("Backend deleteProduct failed, using local store:", err);
+        console.warn("Backend deleteProduct failed:", err);
       }
     }
 
@@ -641,19 +642,13 @@ class ApiClient {
           parent_id: formData.parentId ? String(formData.parentId) : null,
         };
 
-        const res = await fetch(`${API_BASE_URL}/api/categories`, {
+        const res = await this.fetchWithAuth(`${API_BASE_URL}/api/categories`, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(this.getAuthToken() ? { Authorization: `Bearer ${this.getAuthToken()}` } : {}),
-          },
           body: JSON.stringify(symfonyCategoryPayload),
         });
         if (res.ok) {
           const raw = await res.json();
           return mapSymfonyCategory(raw);
-        } else if (res.status === 401) {
-          throw new Error("401 Unauthorized: Please login with admin credentials to create categories.");
         } else {
           const errData = await res.json().catch(() => ({}));
           throw new Error(errData.message || `Server Error (${res.status}): PostgreSQL connection or backend error.`);
@@ -694,12 +689,8 @@ class ApiClient {
         if (data.parentId !== undefined)
           symfonyCategoryPayload.parent_id = data.parentId ? String(data.parentId) : null;
 
-        const res = await fetch(`${API_BASE_URL}/api/categories/${id}`, {
+        const res = await this.fetchWithAuth(`${API_BASE_URL}/api/categories/${id}`, {
           method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            ...(this.getAuthToken() ? { Authorization: `Bearer ${this.getAuthToken()}` } : {}),
-          },
           body: JSON.stringify(symfonyCategoryPayload),
         });
         if (res.ok) {
@@ -707,7 +698,7 @@ class ApiClient {
           return mapSymfonyCategory(raw);
         }
       } catch (err) {
-        console.warn("Backend updateCategory failed, using local store:", err);
+        console.warn("Backend updateCategory failed:", err);
       }
     }
 
@@ -731,15 +722,12 @@ class ApiClient {
   async deleteCategory(id: number | string): Promise<boolean> {
     if (!this.isDemoMode()) {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/categories/${id}`, {
+        const res = await this.fetchWithAuth(`${API_BASE_URL}/api/categories/${id}`, {
           method: "DELETE",
-          headers: {
-            ...(this.getAuthToken() ? { Authorization: `Bearer ${this.getAuthToken()}` } : {}),
-          },
         });
         if (res.ok) return true;
       } catch (err) {
-        console.warn("Backend deleteCategory failed, using local store:", err);
+        console.warn("Backend deleteCategory failed:", err);
       }
     }
 
@@ -783,24 +771,19 @@ class ApiClient {
         formData.append("file", file);
         formData.append("folder", folder);
 
-        const res = await fetch(`${API_BASE_URL}/api/upload`, {
+        const res = await this.fetchWithAuth(`${API_BASE_URL}/api/upload`, {
           method: "POST",
-          headers: {
-            ...(this.getAuthToken() ? { Authorization: `Bearer ${this.getAuthToken()}` } : {}),
-          },
           body: formData,
         });
 
         if (res.ok) {
           const json = await res.json();
-          const uploadUrl = json.data?.url || json.url;
-          if (uploadUrl) {
+          const rawUrl = json.data?.url || json.url;
+          if (rawUrl) {
+            const uploadUrl = rawUrl.startsWith("http") ? rawUrl : `${API_BASE_URL}${rawUrl}`;
             this.recordUploadedMedia(file.name, uploadUrl, file.size, file.type, folder);
             return { url: uploadUrl, name: file.name, size: file.size };
           }
-        } else if (res.status === 401) {
-          this.handleUnauthorized();
-          throw new Error("Unauthorized: Session expired. Please log in again.");
         } else {
           const json = await res.json().catch(() => ({}));
           throw new Error(json.error || json.message || `Upload failed with status ${res.status}`);

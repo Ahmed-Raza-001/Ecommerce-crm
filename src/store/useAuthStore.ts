@@ -41,7 +41,7 @@ const initialUser = getInitialUser();
 export const useAuthStore = create<ExtendedAuthState & AuthActions>((set, get) => ({
   user: initialUser,
   token: initialToken,
-  isAuthenticated: !!initialToken,
+  isAuthenticated: !!(initialToken || initialUser),
   isLoading: false,
   error: null,
 
@@ -49,6 +49,9 @@ export const useAuthStore = create<ExtendedAuthState & AuthActions>((set, get) =
     set({ isLoading: true, error: null });
     try {
       const { token, user } = await apiClient.login(email, password);
+      if (typeof window !== "undefined" && token) {
+        localStorage.setItem("ecommerce_crm_token", token);
+      }
       set({
         user,
         token,
@@ -99,7 +102,8 @@ export const useAuthStore = create<ExtendedAuthState & AuthActions>((set, get) =
 
   checkAuth: async () => {
     const token = getInitialToken();
-    if (!token) {
+    const storedUser = getInitialUser();
+    if (!token && !storedUser) {
       set({ user: null, token: null, isAuthenticated: false });
       return;
     }
@@ -107,7 +111,7 @@ export const useAuthStore = create<ExtendedAuthState & AuthActions>((set, get) =
     try {
       const user = await apiClient.getCurrentUser();
       if (user) {
-        set({ user, token, isAuthenticated: true });
+        set({ user, token: token || getInitialToken(), isAuthenticated: true });
       } else {
         // Token invalid or expired
         get().logout();

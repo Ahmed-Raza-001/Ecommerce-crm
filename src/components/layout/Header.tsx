@@ -149,12 +149,11 @@ export function Header() {
             className="flex items-center gap-2.5 pl-3 py-1 border-l border-[#E2E8F0] hover:opacity-90 transition-all cursor-pointer select-none"
           >
             <div className="h-9 w-9 rounded-xl overflow-hidden border border-[#E2E8F0] bg-slate-100 flex items-center justify-center shrink-0">
-              {user?.avatar ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={user.avatar} alt={user.name || user.email} className="h-full w-full object-cover" />
-              ) : (
-                <UserIcon className="h-4 w-4 text-[#64748B]" />
-              )}
+              <img
+                src={user?.avatar || "https://api.dicebear.com/7.x/avataaars/svg?seed=AdminUser"}
+                alt={user?.name || user?.email || "Admin"}
+                className="h-full w-full object-cover bg-blue-50"
+              />
             </div>
             <div className="hidden lg:flex flex-col text-left">
               <span className="text-xs font-bold text-[#111827] truncate max-w-[130px]">

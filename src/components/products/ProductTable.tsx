@@ -51,6 +51,13 @@ export function ProductTable({ products }: ProductTableProps) {
     });
   };
 
+  const handleStatusChange = (product: Product, newStatus: "active" | "draft" | "out_of_stock") => {
+    updateMutation.mutate({
+      id: product.id,
+      data: { status: newStatus },
+    });
+  };
+
   return (
     <>
       <div className="rounded-2xl border border-[#E2E8F0] bg-white overflow-hidden shadow-xs">
@@ -192,17 +199,29 @@ export function ProductTable({ products }: ProductTableProps) {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge
-                        variant={
-                          product.status === "active"
-                            ? "success"
-                            : product.status === "draft"
-                            ? "warning"
-                            : "secondary"
+                      <select
+                        value={product.status || "active"}
+                        onChange={(e) =>
+                          handleStatusChange(product, e.target.value as "active" | "draft" | "out_of_stock")
                         }
+                        className={`text-xs font-medium py-1 rounded-sm px-3 border outline-none cursor-pointer transition-all ${
+                          product.status === "active"
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                            : product.status === "draft"
+                            ? "bg-amber-50 text-amber-700 border-amber-200"
+                            : "bg-red-50 text-red-700 border-red-200"
+                        }`}
                       >
-                        {product.status}
-                      </Badge>
+                        <option value="active" className="bg-white text-emerald-700 font-semibold">
+                          Active
+                        </option>
+                        <option value="draft" className="bg-white text-amber-700 font-semibold">
+                          Draft
+                        </option>
+                        <option value="out_of_stock" className="bg-white text-red-700 font-semibold">
+                          Out of Stock
+                        </option>
+                      </select>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">

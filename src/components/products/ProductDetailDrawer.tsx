@@ -105,7 +105,7 @@ export function ProductDetailDrawer() {
           {/* Category & Metadata */}
           <div className="space-y-3 rounded-2xl border border-[#E2E8F0] bg-slate-50/70 p-4">
             <h4 className="text-xs font-bold uppercase tracking-wider text-[#64748B]">
-              Inventory & Classification
+              Inventory & Jewellery Specifications
             </h4>
             <div className="space-y-2 text-xs">
               <div className="flex items-center justify-between py-1 border-b border-[#E2E8F0]">
@@ -115,14 +115,52 @@ export function ProductDetailDrawer() {
                 </span>
               </div>
               <div className="flex items-center justify-between py-1 border-b border-[#E2E8F0]">
-                <span className="text-[#64748B]">SKU Code</span>
-                <span className="font-mono font-semibold text-[#111827]">{product.sku}</span>
+                <span className="text-[#64748B]">Jewellery Type</span>
+                <span className="font-semibold text-[#111827]">
+                  {product.jewelleryType || "—"}
+                </span>
               </div>
               <div className="flex items-center justify-between py-1 border-b border-[#E2E8F0]">
-                <span className="text-[#64748B]">Cost Price</span>
+                <span className="text-[#64748B]">Material</span>
                 <span className="font-semibold text-[#111827]">
-                  {product.costPrice ? formatCurrency(product.costPrice) : "—"}
+                  {product.material || "—"}
                 </span>
+              </div>
+              <div className="flex items-center justify-between py-1 border-b border-[#E2E8F0]">
+                <span className="text-[#64748B]">Colour</span>
+                <span className="font-semibold text-[#111827]">
+                  {product.colour || "—"}
+                </span>
+              </div>
+              <div className="flex items-center justify-between py-1 border-b border-[#E2E8F0]">
+                <span className="text-[#64748B]">Weight</span>
+                <span className="font-semibold text-[#111827]">
+                  {product.weight || "—"}
+                </span>
+              </div>
+              <div className="flex items-center justify-between py-1 border-b border-[#E2E8F0]">
+                <span className="text-[#64748B]">Size</span>
+                <span className="font-semibold text-[#111827]">
+                  {product.size || "—"}
+                </span>
+              </div>
+              <div className="flex items-center justify-between py-1 border-b border-[#E2E8F0]">
+                <span className="text-[#64748B]">Highlights</span>
+                <div className="flex items-center gap-1.5">
+                  {product.isNewArrival && (
+                    <Badge variant="cyan">New Arrival</Badge>
+                  )}
+                  {product.isBestSeller && (
+                    <Badge variant="success">Best Seller</Badge>
+                  )}
+                  {!product.isNewArrival && !product.isBestSeller && (
+                    <span className="text-[#64748B]">Standard Catalog</span>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center justify-between py-1 border-b border-[#E2E8F0]">
+                <span className="text-[#64748B]">SKU Code</span>
+                <span className="font-mono font-semibold text-[#111827]">{product.sku}</span>
               </div>
               <div className="flex items-center justify-between py-1">
                 <span className="text-[#64748B]">Created On</span>

@@ -1,6 +1,6 @@
 import { Category } from "./category";
 
-export type ProductStatus = "active" | "draft" | "archived" | "low_stock" | "out_of_stock";
+export type ProductStatus = "active" | "draft" | "out_of_stock";
 
 export interface Product {
   id: number | string;
@@ -12,7 +12,14 @@ export interface Product {
   compareAtPrice?: number;
   costPrice?: number;
   stock: number;
-  status: "active" | "draft" | "archived";
+  status: ProductStatus;
+  isNewArrival?: boolean;
+  isBestSeller?: boolean;
+  weight?: string;
+  material?: string;
+  colour?: string;
+  size?: string;
+  jewelleryType?: string;
   category?: Category | null;
   categoryId?: number | string | null;
   image?: string | null;
@@ -30,7 +37,14 @@ export interface ProductFormData {
   compareAtPrice?: number;
   costPrice?: number;
   stock: number;
-  status: "active" | "draft" | "archived";
+  status: ProductStatus;
+  isNewArrival?: boolean;
+  isBestSeller?: boolean;
+  weight?: string;
+  material?: string;
+  colour?: string;
+  size?: string;
+  jewelleryType?: string;
   categoryId?: number | string | null;
   image?: string | null;
   gallery?: string[];

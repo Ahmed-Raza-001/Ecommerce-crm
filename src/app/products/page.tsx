@@ -41,12 +41,10 @@ function ProductsPageContent() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-foreground flex items-center gap-2">
-              <Package className="h-7 w-7 text-primary" /> Product Catalog CRM
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground flex items-center gap-2">
+              <Package className="h-7 w-7 text-primary" /> Product List
             </h1>
-            <Badge variant="secondary" className="font-bold">
-              {products?.length ?? 0} Items
-            </Badge>
+         
           </div>
           <p className="text-xs md:text-sm text-muted-foreground mt-1">
             Search, filter, update stock inline, and manage your e-commerce repository.

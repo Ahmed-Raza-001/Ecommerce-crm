@@ -35,7 +35,14 @@ const productSchema = z.object({
   compareAtPrice: z.coerce.number().optional(),
   costPrice: z.coerce.number().optional(),
   stock: z.coerce.number().int().min(0, "Stock cannot be negative"),
-  status: z.enum(["active", "draft", "archived"]),
+  status: z.enum(["active", "draft", "out_of_stock"]),
+  isNewArrival: z.boolean().optional(),
+  isBestSeller: z.boolean().optional(),
+  jewelleryType: z.string().optional(),
+  material: z.string().optional(),
+  colour: z.string().optional(),
+  weight: z.string().optional(),
+  size: z.string().optional(),
   categoryId: z.union([z.string(), z.number()]).nullable().optional(),
   image: z.string().nullable().optional(),
   tagsString: z.string().optional(),
@@ -78,6 +85,13 @@ export function ProductForm({
       costPrice: initialData?.costPrice || 0,
       stock: initialData?.stock !== undefined ? initialData.stock : 20,
       status: initialData?.status || "active",
+      isNewArrival: initialData?.isNewArrival || false,
+      isBestSeller: initialData?.isBestSeller || false,
+      jewelleryType: initialData?.jewelleryType || "",
+      material: initialData?.material || "",
+      colour: initialData?.colour || "",
+      weight: initialData?.weight || "",
+      size: initialData?.size || "",
       categoryId: initialData?.categoryId || (categories[0]?.id ?? null),
       image: initialData?.image || null,
       tagsString: initialData?.tags?.join(", ") || "",
@@ -130,6 +144,13 @@ export function ProductForm({
       costPrice: values.costPrice ? Number(values.costPrice) : undefined,
       stock: Number(values.stock),
       status: values.status,
+      isNewArrival: values.isNewArrival,
+      isBestSeller: values.isBestSeller,
+      jewelleryType: values.jewelleryType,
+      material: values.material,
+      colour: values.colour,
+      weight: values.weight,
+      size: values.size,
       categoryId: values.categoryId || null,
       image: previewImage || values.image || null,
       tags,
@@ -253,6 +274,76 @@ export function ProductForm({
             </CardContent>
           </Card>
 
+          {/* Section: Jewellery Specifications & Badges */}
+          <Card className="bg-white border-[#E2E8F0] shadow-xs">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-base font-bold flex items-center gap-2 text-[#111827]">
+                <Sparkles className="h-4 w-4 text-[#2563EB]" /> Jewellery Attributes & Specs
+              </CardTitle>
+              <CardDescription className="text-[#64748B]">
+                Specify craftsmanship metrics, material details, sizing, and storefront highlight badges
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Input
+                  label="Jewellery Type"
+                  placeholder="e.g. Necklace Set, Earrings, Ring, Bangles"
+                  {...register("jewelleryType")}
+                  className="bg-[#F8FAFC]"
+                />
+                <Input
+                  label="Material"
+                  placeholder="e.g. 24K Gold Plated, Kundan, Brass"
+                  {...register("material")}
+                  className="bg-[#F8FAFC]"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <Input
+                  label="Colour"
+                  placeholder="e.g. Ruby Red, Emerald Green, Gold"
+                  {...register("colour")}
+                  className="bg-[#F8FAFC]"
+                />
+                <Input
+                  label="Weight"
+                  placeholder="e.g. 45g"
+                  {...register("weight")}
+                  className="bg-[#F8FAFC]"
+                />
+                <Input
+                  label="Size"
+                  placeholder="e.g. Adjustable / 18 Inches / 2.4"
+                  {...register("size")}
+                  className="bg-[#F8FAFC]"
+                />
+              </div>
+
+              {/* Toggles for New Arrival & Best Seller */}
+              <div className="flex flex-wrap items-center gap-6 pt-2 border-t border-[#E2E8F0]">
+                <label className="flex items-center gap-2 text-sm font-semibold text-[#111827] cursor-pointer">
+                  <input
+                    type="checkbox"
+                    {...register("isNewArrival")}
+                    className="h-4 w-4 rounded border-[#E2E8F0] text-[#2563EB] focus:ring-[#2563EB] cursor-pointer"
+                  />
+                  <span>Mark as New Arrival</span>
+                </label>
+
+                <label className="flex items-center gap-2 text-sm font-semibold text-[#111827] cursor-pointer">
+                  <input
+                    type="checkbox"
+                    {...register("isBestSeller")}
+                    className="h-4 w-4 rounded border-[#E2E8F0] text-[#2563EB] focus:ring-[#2563EB] cursor-pointer"
+                  />
+                  <span>Mark as Best Seller</span>
+                </label>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Section 2: Pricing & Inventory */}
           <Card className="bg-white border-[#E2E8F0] shadow-xs">
             <CardHeader className="pb-4">
@@ -309,7 +400,7 @@ export function ProductForm({
                 <Select label="Status" {...register("status")} className="bg-[#F8FAFC]">
                   <option value="active">Active (Published to Catalog)</option>
                   <option value="draft">Draft (Hidden)</option>
-                  <option value="archived">Archived</option>
+                  <option value="out_of_stock">Out of Stock</option>
                 </Select>
               </div>
             </CardContent>

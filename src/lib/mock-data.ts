@@ -16,43 +16,19 @@ const STORAGE_KEYS = {
 };
 
 export function getStoredProducts(): Product[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const data = localStorage.getItem(STORAGE_KEYS.PRODUCTS);
-    if (!data) return [];
-    return JSON.parse(data);
-  } catch {
-    return [];
-  }
+  return [];
 }
 
-export function saveStoredProducts(products: Product[]): void {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(products));
-  } catch (err) {
-    console.error("Failed to save products to localStorage", err);
-  }
+export function saveStoredProducts(_products: Product[]): void {
+  // Products are managed strictly via live API, not stored in localStorage
 }
 
 export function getStoredCategories(): Category[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const data = localStorage.getItem(STORAGE_KEYS.CATEGORIES);
-    if (!data) return [];
-    return JSON.parse(data);
-  } catch {
-    return [];
-  }
+  return [];
 }
 
-export function saveStoredCategories(categories: Category[]): void {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(categories));
-  } catch (err) {
-    console.error("Failed to save categories to localStorage", err);
-  }
+export function saveStoredCategories(_categories: Category[]): void {
+  // Categories are managed strictly via live API, not stored in localStorage
 }
 
 export function getStoredMedia(): MediaAsset[] {
